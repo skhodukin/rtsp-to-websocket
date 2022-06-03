@@ -35,7 +35,8 @@
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "express-ws": "^5.0.2",
-    "ps-node": "^0.1.6"
+    "ps-node": "^0.1.6",
+    "rtsp-relay": "^1.6.1"
   },
   "devDependencies": {
     "@types/express-ws": "^3.0.1",
@@ -46,7 +47,7 @@
     "@types/puppeteer": "^5.4.5",
     "eslint": "^8.10.0",
     "eslint-config-kyle": "^8.11.1",
-    "express": "^4.17.3",
+    "express": "^4.18.1",
     "jest": "^27.5.1",
     "jest-image-snapshot": "^4.5.1",
     "puppeteer": "^13.4.1",
