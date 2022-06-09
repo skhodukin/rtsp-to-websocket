@@ -31,12 +31,12 @@ class Server {
           // These errors most commonly occur when FFmpeg closes and there is still
           // data to write.  If left unhandled, the server will crash.
           proc.stdin.on('error', (e) => {
-           // console.log('FFmpeg STDIN Error', e);
+            console.log('FFmpeg STDIN Error', e);
           });
 
           // FFmpeg outputs all of its messages to STDERR.  Let's log them to the console.
           proc.stderr.on('data', (data) => {
-           // console.log('FFmpeg STDERR:', data.toString());
+            console.log('FFmpeg :', data.toString());
           });
 
             socket.onmessage = function (event) {
