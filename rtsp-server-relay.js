@@ -1,80 +1,78 @@
+const RtspServer = require('rtsp-streaming-server').default;
+const child_process = require('child_process');
 const WebSocket = require('ws');
+
 const socket = new WebSocket('ws://localhost:2000');
 
-/** * */
-const rtsp = require('rtsp-server');
-const sdpTransform = require('sdp-transform');
+class Server {
+    static get IsWindows() { return process.platform === "win32"; }
+    static start = async () => {
 
-const sdpStr = "v=0\r\n\
-o=- 0 0 IN IP4 127.0.0.1\r\n\
-s=Stream\r\n\
-t=0 0\r\n\
-m=video 2001 RTP/AVP 96\r\n\
-b=AS:301\r\n\
-a=rtpmap:96 H264/90000\r\n\
-a=fmtp:96 packetization-mode=1; sprop-parameter-sets=Z0LAHtkB4I/rARAAAAMAEAAAAwPA8WLkgA==,aMuMsg==; profile-level-id=42C01E\r\n\
-a=control:trackID=0\r\n\
-m=audio 0 RTP/AVP 97\r\n\
-b=AS:112\r\n\
-a=rtpmap:97 MPEG4-GENERIC/48000/2\r\n\
-a=fmtp:97 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3; config=1190\r\n\
-a=control:trackID=1\r\n\
-";
+        let proc = null;
+        try {
+            this.server = new RtspServer({
+                serverPort: 5554,
+                clientPort: 6554,
+                rtpPortStart: 10000,
+                rtpPortCount: 10000
+            });
+            await this.server.start();
+            await this.delay(2000);
+            console.log("ffmpeg Starting");
+            proc = await this.ffmpeg();
 
+              // If FFmpeg stops for any reason, close the WebSocket connection.
+          proc.on('close', (code, signal) => {
+            console.log('FFmpeg child process closed, code ' + code + ', signal ' + signal);
 
-const server = rtsp.createServer((req, res) => {
-  console.log(req.method, req.url);
-  switch (req.method) {
-    case 'OPTIONS':
-      res.setHeader('Public', 'OPTIONS');
-      res.end();
-      break;
-    case 'PLAY':
-      res.setHeader('Public', 'PLAY');
-      socket.onmessage = function (event) {
-        console.log(event.data);
-        res.write(event.data);
-      }
-      res.end();
-      break;
-    case 'SETUP':
-      res.setHeader('Public', 'SETUP');
-      res.end();
-      break;
-    case 'TEARDOWN':
-      res.setHeader('Public', 'TEARDOWN');
-      res.end();
-      break;
-    case 'DESCRIBE':
-      res.setHeader('Content-Base', 'rtsp://127.0.0.1:2001');
-      res.setHeader('Content-Type', 'application/sdp');
-      // res.write(sdpTransform.write(sdpStr)); !!!!!!!
+          });
 
-      res.end();
-      break;
-    case 'PAUSE':
-      res.setHeader('Public', 'PAUSE');
-      res.end();
-      break;
-  }
+          // Handle STDIN pipe errors by logging to the console.
+          // These errors most commonly occur when FFmpeg closes and there is still
+          // data to write.  If left unhandled, the server will crash.
+          proc.stdin.on('error', (e) => {
+           // console.log('FFmpeg STDIN Error', e);
+          });
 
+          // FFmpeg outputs all of its messages to STDERR.  Let's log them to the console.
+          proc.stderr.on('data', (data) => {
+           // console.log('FFmpeg STDERR:', data.toString());
+          });
 
+            socket.onmessage = function (event) {
+               // console.log(event.data);
+                proc.stdin.write(event.data);
+            }
 
-  // socket.addEventListener('open', (e) => {
-  //   socket.on('message', (m) => {
-  //     console.log('m', m)
-  //
-  //     res.end(m);
-  //   });
-  //   // send a message to the server
-  //
-  //   console.log('open');
-  // });
-  // will echo the CSeq header used in the request
-});
+            socket.onclose = function (event) {
+               // console.log(event);
+                proc.kill('SIGINT');
+            }
 
+        } catch (ex) {
+            console.log(ex);
+        }
+    }
 
-server.listen(2001, () => {
-  const { port } = server.address();
-  console.log('RTSP server is running on port:', port);
-});
+    static guid() {
+        return '1';
+
+    }
+
+    static ffmpeg = async () => {
+        let streamId = this.guid();
+        console.log(`RTSP: rtsp://127.0.0.1:6554/${streamId}`);
+        return child_process.spawn(`ffmpeg`, [
+                // FFmpeg will read input video from STDIN
+                '-i', '-',
+                '-c', 'copy',
+                '-f', 'rtsp', `rtsp://127.0.0.1:5554/${streamId}`
+        ]);
+    }
+
+    static delay = async (ms) => {
+        return new Promise((res) => setTimeout(res, ms));
+    }
+}
+
+Server.start();
