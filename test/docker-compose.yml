@@ -1,0 +1,8 @@
+  rtsp-relay:
+    image: flaviostutz/rtsp-relay
+    ports:
+        - 8554:8554
+    environment:
+        - SOURCE_URL=file:///samples/test1.mp4
+    volumes:
+        - ./samples:/samples
